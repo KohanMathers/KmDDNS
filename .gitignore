@@ -1,0 +1,24 @@
+TEST.md
+INTERNAL.md
+
+# Dependencies
+node_modules/
+
+# Wrangler
+.wrangler/
+worker/.wrangler/
+
+# Environment / secrets
+.env
+.env.*
+.dev.vars
+
+# Build output
+dist/
+worker/dist/
+
+# Editor
+.vscode/
+.idea/
+*.suo
+*.user

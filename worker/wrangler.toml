@@ -1,0 +1,25 @@
+name = "kmddns-api"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+[[kv_namespaces]]
+binding = "DDNS_KV"
+id = "c9c8ea316456445fbb706b41652edfd7"
+preview_id = "219707856c2948c190d7c28fbe11cd99"
+
+[vars]
+BASE_DOMAIN = "ddns.kmathers.co.uk"
+MAX_SUBDOMAIN_LENGTH = "63"
+DEFAULT_TTL = "60"
+STALE_DAYS = "30"
+ALLOW_PRIVATE_IPS = "false"
+WEBHOOK_HOST_ALLOWLIST = ""
+
+[triggers]
+crons = ["0 3 * * *"]
+
+# Secrets (set via `wrangler secret put`):
+#   CF_API_TOKEN   — Cloudflare API token with Zone:DNS:Edit + Zone:Zone:Read
+#   CF_ZONE_ID     — Cloudflare zone ID for your domain
+#   ADMIN_SECRET   — Long-lived secret for admin route access
+#   RESEND_API_KEY — (optional) Resend API key for stale-record notification emails
