@@ -31,7 +31,7 @@ export async function handleAdminListClients(c: AppContext): Promise<Response> {
     // Backfill metadata so future list calls can avoid the extra read.
     c.executionCtx.waitUntil(putClient(c.env.DDNS_KV, record));
     const { webhook_secret: _s, ...safe } = record;
-    return safe;
+    return { ...safe, webhook_secret: null };
   }
 
   const clients = await Promise.all(
