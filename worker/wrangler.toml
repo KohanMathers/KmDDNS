@@ -1,11 +1,12 @@
-name = "kmddns-api"
+name = "kmddns"
 main = "src/index.ts"
-compatibility_date = "2025-01-01"
+compatibility_date = "2025-03-14"
 
-[[kv_namespaces]]
-binding = "DDNS_KV"
-id = "c9c8ea316456445fbb706b41652edfd7"
-preview_id = "219707856c2948c190d7c28fbe11cd99"
+[[d1_databases]]
+binding = "kmddns"
+database_name = "kmddns"
+database_id = "1ca88f67-af60-4d13-af53-38b6ec36e984"
+migrations_dir = "migrations"
 
 [vars]
 BASE_DOMAIN = "ddns.kmathers.co.uk"

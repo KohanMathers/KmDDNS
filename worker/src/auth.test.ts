@@ -1,24 +1,69 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { Hono } from 'hono';
+import Database from 'better-sqlite3';
+import { readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { sha256, bearerAuth, adminAuth } from './auth.js';
-import { putClient } from './kv.js';
+import { putClient } from './db.js';
 import type { ClientRecord, Env, Variables } from './types.js';
 
-function makeKv() {
-  const store = new Map<string, string>();
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const SCHEMA = readFileSync(join(__dirname, '../migrations/0001_initial.sql'), 'utf8');
+
+function makeDb(): D1Database {
+  const sqlite = new Database(':memory:');
+  sqlite.pragma('foreign_keys = ON');
+  sqlite.exec(SCHEMA);
+
+  function boundStmt(sql: string, params: unknown[]) {
+    return {
+      async first<T>() {
+        return (sqlite.prepare(sql).get(params as unknown[]) as T | null) ?? null;
+      },
+      async all<T>() {
+        return { results: sqlite.prepare(sql).all(params as unknown[]) as T[], meta: {} };
+      },
+      async run() {
+        sqlite.prepare(sql).run(params as unknown[]);
+        return { results: [], success: true, meta: { last_row_id: 0, changes: 0 } };
+      },
+      _sql: sql,
+      _params: params,
+    };
+  }
+
   return {
-    store,
-    kv: {
-      async get(key: string) { return store.get(key) ?? null; },
-      async put(key: string, value: string) { store.set(key, value); },
-      async delete(key: string) { store.delete(key); },
-    } as unknown as KVNamespace,
-  };
+    prepare(sql: string) {
+      return {
+        bind(...params: unknown[]) { return boundStmt(sql, params); },
+      } as unknown as D1PreparedStatement;
+    },
+    async batch(statements: ReturnType<typeof boundStmt>[]) {
+      const results: { results: unknown[]; success: boolean; meta: object }[] = [];
+      const tx = sqlite.transaction(() => {
+        for (const s of statements) {
+          let rows: unknown[];
+          try {
+            rows = sqlite.prepare(s._sql).all(s._params as unknown[]);
+          } catch {
+            sqlite.prepare(s._sql).run(s._params as unknown[]);
+            rows = [];
+          }
+          results.push({ results: rows, success: true, meta: {} });
+        }
+      });
+      tx();
+      return results as Awaited<ReturnType<D1Database['batch']>>;
+    },
+    async dump() { return new ArrayBuffer(0); },
+    async exec(sql: string) { sqlite.exec(sql); return { count: 0, duration: 0 }; },
+  } as unknown as D1Database;
 }
 
-function makeEnv(kv: KVNamespace, overrides: Partial<Env> = {}): Env {
+function makeEnv(db: D1Database, overrides: Partial<Env> = {}): Env {
   return {
-    DDNS_KV: kv,
+    kmddns: db,
     BASE_DOMAIN: 'ddns.example.com',
     MAX_SUBDOMAIN_LENGTH: '63',
     DEFAULT_TTL: '60',
@@ -53,13 +98,16 @@ const BASE_RECORD: ClientRecord = {
   notes: null,
 };
 
-function makeApp(kv: KVNamespace, adminSecret = 'super-secret') {
+let db: D1Database;
+beforeEach(() => { db = makeDb(); });
+
+function makeApp(adminSecret = 'super-secret') {
   const app = new Hono<{ Bindings: Env; Variables: Variables }>();
   app.use('/protected/*', bearerAuth);
   app.use('/admin/*', adminAuth);
   app.get('/protected/me', (c) => c.json({ subdomain: c.get('client').subdomain }));
   app.get('/admin/stats', (c) => c.json({ ok: true }));
-  return { app, env: makeEnv(kv, { ADMIN_SECRET: adminSecret }) };
+  return { app, env: makeEnv(db, { ADMIN_SECRET: adminSecret }) };
 }
 
 describe('sha256', () => {
@@ -80,14 +128,14 @@ describe('sha256', () => {
 
 describe('bearerAuth', () => {
   it('returns 401 missing_token when Authorization header is absent', async () => {
-    const { app, env } = makeApp(makeKv().kv);
+    const { app, env } = makeApp();
     const res = await app.request('/protected/me', {}, env);
     expect(res.status).toBe(401);
     expect(await res.json()).toMatchObject({ error: 'missing_token' });
   });
 
   it('returns 401 missing_token for non-Bearer scheme', async () => {
-    const { app, env } = makeApp(makeKv().kv);
+    const { app, env } = makeApp();
     const res = await app.request('/protected/me', {
       headers: { Authorization: 'Basic dXNlcjpwYXNz' },
     }, env);
@@ -96,7 +144,7 @@ describe('bearerAuth', () => {
   });
 
   it('returns 401 invalid_token for an unknown token', async () => {
-    const { app, env } = makeApp(makeKv().kv);
+    const { app, env } = makeApp();
     const res = await app.request('/protected/me', {
       headers: { Authorization: 'Bearer unknown-token' },
     }, env);
@@ -105,13 +153,12 @@ describe('bearerAuth', () => {
   });
 
   it('resolves to the correct ClientRecord and attaches it to context', async () => {
-    const { kv } = makeKv();
     const plainToken = 'my-plain-token';
     const hash = await sha256(plainToken);
     const record: ClientRecord = { ...BASE_RECORD, token: hash };
-    await putClient(kv, record);
+    await putClient(db, record);
 
-    const { app, env } = makeApp(kv);
+    const { app, env } = makeApp();
     const res = await app.request('/protected/me', {
       headers: { Authorization: `Bearer ${plainToken}` },
     }, env);
@@ -120,12 +167,11 @@ describe('bearerAuth', () => {
   });
 
   it('returns 403 account_disabled when enabled is false', async () => {
-    const { kv } = makeKv();
     const plainToken = 'disabled-token';
     const hash = await sha256(plainToken);
-    await putClient(kv, { ...BASE_RECORD, token: hash, enabled: false });
+    await putClient(db, { ...BASE_RECORD, token: hash, enabled: false });
 
-    const { app, env } = makeApp(kv);
+    const { app, env } = makeApp();
     const res = await app.request('/protected/me', {
       headers: { Authorization: `Bearer ${plainToken}` },
     }, env);
@@ -136,14 +182,14 @@ describe('bearerAuth', () => {
 
 describe('adminAuth', () => {
   it('returns 403 when X-Admin-Secret is missing', async () => {
-    const { app, env } = makeApp(makeKv().kv);
+    const { app, env } = makeApp();
     const res = await app.request('/admin/stats', {}, env);
     expect(res.status).toBe(403);
     expect(await res.json()).toMatchObject({ error: 'forbidden' });
   });
 
   it('returns 403 for a wrong secret', async () => {
-    const { app, env } = makeApp(makeKv().kv);
+    const { app, env } = makeApp();
     const res = await app.request('/admin/stats', {
       headers: { 'X-Admin-Secret': 'wrong' },
     }, env);
@@ -151,7 +197,7 @@ describe('adminAuth', () => {
   });
 
   it('passes through with the correct secret', async () => {
-    const { app, env } = makeApp(makeKv().kv);
+    const { app, env } = makeApp();
     const res = await app.request('/admin/stats', {
       headers: { 'X-Admin-Secret': 'super-secret' },
     }, env);

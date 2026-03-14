@@ -1,5 +1,5 @@
 import type { Env, ClientRecord } from './types.js';
-import { getClient, putClient, readClientSummaryFromMetadata } from './kv.js';
+import { putClient, getStaleEnabledClients, purgeExpired } from './db.js';
 import { withdrawDnsRecords } from './dns.js';
 
 async function sendStaleEmail(env: Env, record: ClientRecord): Promise<void> {
@@ -33,67 +33,16 @@ export async function handleScheduled(
   ctx: ExecutionContext,
 ): Promise<void> {
   const staleDays = parseInt(env.STALE_DAYS, 10);
-  const staleBefore = Date.now() - staleDays * 24 * 60 * 60 * 1000;
+  const staleBeforeISO = new Date(Date.now() - staleDays * 24 * 60 * 60 * 1000).toISOString();
 
-  let cursor: string | undefined;
+  const staleRecords = await getStaleEnabledClients(env.kmddns, staleBeforeISO);
 
-  async function processStale(record: ClientRecord): Promise<void> {
+  for (const record of staleRecords) {
     await withdrawDnsRecords(env, record);
     record.enabled = false;
-    await putClient(env.DDNS_KV, record);
+    await putClient(env.kmddns, record);
     ctx.waitUntil(sendStaleEmail(env, record));
   }
 
-  do {
-    const opts: KVNamespaceListOptions = { prefix: 'client:', limit: 100 };
-    if (cursor !== undefined) opts.cursor = cursor;
-
-    const page = await env.DDNS_KV.list(opts);
-
-    const tokensNeedingFetch: string[] = [];
-    const staleTokens: string[] = [];
-    const fetchedRecords = new Map<string, ClientRecord>();
-
-    for (const key of page.keys) {
-      const token = key.name.slice('client:'.length);
-      const summary = readClientSummaryFromMetadata(key.metadata);
-      if (!summary) {
-        tokensNeedingFetch.push(token);
-        continue;
-      }
-      if (!summary.enabled) continue;
-      const lastActivity = summary.last_seen ?? summary.created_at;
-      if (new Date(lastActivity).getTime() <= staleBefore) {
-        staleTokens.push(token);
-      }
-    }
-
-    if (tokensNeedingFetch.length > 0) {
-      const fetched = await Promise.all(tokensNeedingFetch.map(token => getClient(env.DDNS_KV, token)));
-      for (const record of fetched) {
-        if (record === null) continue;
-        fetchedRecords.set(record.token, record);
-        if (!record.enabled) continue;
-        const lastActivity = record.last_seen ?? record.created_at;
-        if (new Date(lastActivity).getTime() <= staleBefore) {
-          staleTokens.push(record.token);
-        }
-      }
-    }
-
-    if (staleTokens.length > 0) {
-      const staleRecords = await Promise.all(
-        staleTokens.map(token => fetchedRecords.get(token) ?? getClient(env.DDNS_KV, token)),
-      );
-      for (const record of staleRecords) {
-        if (record === null) continue;
-        if (!record.enabled) continue;
-        const lastActivity = record.last_seen ?? record.created_at;
-        if (new Date(lastActivity).getTime() > staleBefore) continue;
-        await processStale(record);
-      }
-    }
-
-    cursor = page.list_complete ? undefined : page.cursor;
-  } while (cursor !== undefined);
+  ctx.waitUntil(purgeExpired(env.kmddns));
 }

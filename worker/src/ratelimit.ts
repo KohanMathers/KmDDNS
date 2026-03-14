@@ -1,4 +1,4 @@
-import { isRateLimitExceeded } from './kv.js';
+import { isRateLimitExceeded } from './db.js';
 import { RATE_LIMITS } from './config.js';
 
 export interface RateLimitResult {
@@ -6,19 +6,19 @@ export interface RateLimitResult {
   retryAfter: number;
 }
 
-export async function checkGlobalLimit(kv: KVNamespace, ip: string): Promise<RateLimitResult> {
-  const exceeded = await isRateLimitExceeded(kv, `global:${ip}`, RATE_LIMITS.globalPerMinute, 60);
+export async function checkGlobalLimit(db: D1Database, ip: string): Promise<RateLimitResult> {
+  const exceeded = await isRateLimitExceeded(db, `global:${ip}`, RATE_LIMITS.globalPerMinute, 60);
   return { allowed: !exceeded, retryAfter: 60 };
 }
 
-export async function checkRegistrationLimit(kv: KVNamespace, ip: string): Promise<RateLimitResult> {
-  const exceeded = await isRateLimitExceeded(kv, `reg:${ip}`, RATE_LIMITS.registrationPerHour, 3600);
+export async function checkRegistrationLimit(db: D1Database, ip: string): Promise<RateLimitResult> {
+  const exceeded = await isRateLimitExceeded(db, `reg:${ip}`, RATE_LIMITS.registrationPerHour, 3600);
   return { allowed: !exceeded, retryAfter: 3600 };
 }
 
-export async function checkUpdateLimit(kv: KVNamespace, token: string): Promise<RateLimitResult> {
+export async function checkUpdateLimit(db: D1Database, token: string): Promise<RateLimitResult> {
   const exceeded = await isRateLimitExceeded(
-    kv,
+    db,
     `update:${token}`,
     RATE_LIMITS.updatePerWindow,
     RATE_LIMITS.updateWindowSecs,

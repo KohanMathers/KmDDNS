@@ -33,7 +33,7 @@ app.use('*', async (c, next) => {
 // 300 req/min per IP across all endpoints
 app.use('*', async (c, next) => {
   const ip = c.req.header('CF-Connecting-IP') ?? '0.0.0.0';
-  const { allowed, retryAfter } = await checkGlobalLimit(c.env.DDNS_KV, ip);
+  const { allowed, retryAfter } = await checkGlobalLimit(c.env.kmddns, ip);
   if (!allowed) {
     return c.json(
       { error: 'rate_limited', message: 'Too many requests' },

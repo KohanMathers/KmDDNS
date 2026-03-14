@@ -1,5 +1,5 @@
 import type { MiddlewareHandler } from 'hono';
-import { getClient } from './kv.js';
+import { getClient } from './db.js';
 import type { Env, Variables } from './types.js';
 
 type AppMiddleware = MiddlewareHandler<{ Bindings: Env; Variables: Variables }>;
@@ -19,7 +19,7 @@ export const bearerAuth: AppMiddleware = async (c, next) => {
   }
 
   const hash = await sha256(header.slice(7));
-  const record = await getClient(c.env.DDNS_KV, hash);
+  const record = await getClient(c.env.kmddns, hash);
 
   if (record === null) {
     return c.json({ error: 'invalid_token', message: 'Token not recognised' }, 401);

@@ -9,7 +9,7 @@ import {
   putPendingCustomDomain,
   deletePendingCustomDomain,
   writeAudit,
-} from '../kv.js';
+} from '../db.js';
 import { upsertCNAME, getRecordId, deleteRecord } from '../dns.js';
 
 type AppContext = Context<{ Bindings: Env; Variables: Variables }>;
@@ -47,7 +47,7 @@ export async function handlePostCustomDomain(c: AppContext): Promise<Response> {
     return c.json({ error: 'invalid_hostname', message: 'hostname must be a valid domain name' }, 400);
   }
 
-  const existingOwner = await getByCustomDomain(c.env.DDNS_KV, hostname);
+  const existingOwner = await getByCustomDomain(c.env.kmddns, hostname);
   if (existingOwner !== null && existingOwner !== client.token) {
     return c.json({ error: 'domain_already_verified', message: 'This hostname is already claimed by another account' }, 409);
   }
@@ -55,7 +55,7 @@ export async function handlePostCustomDomain(c: AppContext): Promise<Response> {
   const challenge = crypto.randomUUID().replace(/-/g, '');
   const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
 
-  await putPendingCustomDomain(c.env.DDNS_KV, hostname, {
+  await putPendingCustomDomain(c.env.kmddns, hostname, {
     token: client.token,
     challenge,
     expires_at: expiresAt,
@@ -83,12 +83,12 @@ export async function handleVerifyCustomDomain(c: AppContext): Promise<Response>
     return c.json({ error: 'invalid_hostname', message: 'hostname must be a valid domain name' }, 400);
   }
 
-  const existingOwner = await getByCustomDomain(c.env.DDNS_KV, hostname);
+  const existingOwner = await getByCustomDomain(c.env.kmddns, hostname);
   if (existingOwner !== null && existingOwner !== client.token) {
     return c.json({ error: 'domain_already_verified', message: 'This hostname is already claimed by another account' }, 409);
   }
 
-  const pending = await getPendingCustomDomain(c.env.DDNS_KV, hostname);
+  const pending = await getPendingCustomDomain(c.env.kmddns, hostname);
   if (pending === null || pending.token !== client.token) {
     return c.json({ error: 'verification_failed', message: 'No pending verification found for this hostname' }, 422);
   }
@@ -106,12 +106,12 @@ export async function handleVerifyCustomDomain(c: AppContext): Promise<Response>
 
   const target = `${client.subdomain}.${c.env.BASE_DOMAIN}`;
   await upsertCNAME(c.env, hostname, target);
-  await putCustomDomainIndex(c.env.DDNS_KV, hostname, client.token);
-  await deletePendingCustomDomain(c.env.DDNS_KV, hostname);
+  await putCustomDomainIndex(c.env.kmddns, hostname, client.token);
+  await deletePendingCustomDomain(c.env.kmddns, hostname);
 
   if (!client.custom_domains.includes(hostname)) {
     const updated = { ...client, custom_domains: [...client.custom_domains, hostname] };
-    await putClient(c.env.DDNS_KV, updated);
+    await putClient(c.env.kmddns, updated);
   }
 
   const now = new Date().toISOString();
@@ -121,7 +121,7 @@ export async function handleVerifyCustomDomain(c: AppContext): Promise<Response>
     timestamp: now,
     details: { hostname },
   };
-  await writeAudit(c.env.DDNS_KV, client.token, entry);
+  await writeAudit(c.env.kmddns, client.token, entry);
 
   return c.json({ hostname, cname_target: target });
 }
@@ -149,10 +149,10 @@ export async function handleDeleteCustomDomain(c: AppContext): Promise<Response>
   const cnameId = await getRecordId(c.env, hostname, 'CNAME');
   if (cnameId) await deleteRecord(c.env, cnameId);
 
-  await deleteCustomDomainIndex(c.env.DDNS_KV, hostname);
+  await deleteCustomDomainIndex(c.env.kmddns, hostname);
 
   const updated = { ...client, custom_domains: client.custom_domains.filter(d => d !== hostname) };
-  await putClient(c.env.DDNS_KV, updated);
+  await putClient(c.env.kmddns, updated);
 
   const now = new Date().toISOString();
   const entry: AuditEntry = {
@@ -161,7 +161,7 @@ export async function handleDeleteCustomDomain(c: AppContext): Promise<Response>
     timestamp: now,
     details: { hostname },
   };
-  await writeAudit(c.env.DDNS_KV, client.token, entry);
+  await writeAudit(c.env.kmddns, client.token, entry);
 
   return new Response(null, { status: 204 });
 }

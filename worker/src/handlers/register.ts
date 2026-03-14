@@ -1,6 +1,6 @@
 import type { AppContext, ClientRecord } from '../types.js';
 import { getConfig, RESERVED_SUBDOMAINS, SUBDOMAIN_REGEX } from '../config.js';
-import { getBySubdomain, putClient, putSubdomainIndex, isBannedSubdomain, isBannedIp } from '../kv.js';
+import { getBySubdomain, putClient, putSubdomainIndex, isBannedSubdomain, isBannedIp } from '../db.js';
 import { sha256 } from '../auth.js';
 import { upsertARecord } from '../dns.js';
 import { checkRegistrationLimit } from '../ratelimit.js';
@@ -10,11 +10,11 @@ import { validateSrvPrefix, validateTags } from '../validation.js';
 export async function handleRegister(c: AppContext): Promise<Response> {
   const ip = c.req.header('CF-Connecting-IP') ?? '0.0.0.0';
 
-  if (await isBannedIp(c.env.DDNS_KV, ip)) {
+  if (await isBannedIp(c.env.kmddns, ip)) {
     return c.json({ error: 'banned', message: 'This IP has been banned' }, 403);
   }
 
-  const { allowed, retryAfter } = await checkRegistrationLimit(c.env.DDNS_KV, ip);
+  const { allowed, retryAfter } = await checkRegistrationLimit(c.env.kmddns, ip);
   if (!allowed) {
     return c.json(
       { error: 'rate_limited', message: 'Too many registrations from this IP' },
@@ -41,11 +41,11 @@ export async function handleRegister(c: AppContext): Promise<Response> {
     return c.json({ error: 'invalid_subdomain', message: 'Subdomain is invalid or reserved' }, 400);
   }
 
-  if (await isBannedSubdomain(c.env.DDNS_KV, subdomain)) {
+  if (await isBannedSubdomain(c.env.kmddns, subdomain)) {
     return c.json({ error: 'banned', message: 'This subdomain has been banned' }, 403);
   }
 
-  const existing = await getBySubdomain(c.env.DDNS_KV, subdomain);
+  const existing = await getBySubdomain(c.env.kmddns, subdomain);
   if (existing !== null) {
     return c.json({ error: 'subdomain_taken', message: 'Subdomain is already registered' }, 409);
   }
@@ -102,8 +102,8 @@ export async function handleRegister(c: AppContext): Promise<Response> {
     notes: null,
   };
 
-  await putClient(c.env.DDNS_KV, record);
-  await putSubdomainIndex(c.env.DDNS_KV, subdomain, tokenHash);
+  await putClient(c.env.kmddns, record);
+  await putSubdomainIndex(c.env.kmddns, subdomain, tokenHash);
 
   await upsertARecord(c.env, subdomain, '0.0.0.0', config.defaultTtl);
 

@@ -2,7 +2,7 @@ import type { Context } from 'hono';
 
 /** Cloudflare Worker environment bindings and secrets. */
 export interface Env {
-  DDNS_KV: KVNamespace;
+  kmddns: D1Database;
   BASE_DOMAIN: string;
   MAX_SUBDOMAIN_LENGTH: string;
   DEFAULT_TTL: string;

@@ -1,5 +1,5 @@
 import type { AppContext, ClientRecord, AuditEntry, Env } from '../types.js';
-import { putClient, deleteClient, deleteClientKey, putSubdomainIndex, putCustomDomainIndex, writeAudit } from '../kv.js';
+import { putClient, deleteClient, rotateClientToken, writeAudit } from '../db.js';
 import { sha256 } from '../auth.js';
 import { upsertARecord, upsertAAAARecord, upsertSRVRecord, withdrawDnsRecords, withdrawSRVRecord } from '../dns.js';
 import { dispatchWebhook } from '../webhook.js';
@@ -262,7 +262,7 @@ export async function handlePatchClient(c: AppContext): Promise<Response> {
     }
   }
 
-  await putClient(c.env.DDNS_KV, updated);
+  await putClient(c.env.kmddns, updated);
 
   const now = new Date().toISOString();
   const entry: AuditEntry = {
@@ -271,7 +271,7 @@ export async function handlePatchClient(c: AppContext): Promise<Response> {
     timestamp: now,
     details: { fields: Object.keys(body).join(',') },
   };
-  await writeAudit(c.env.DDNS_KV, client.token, entry);
+  await writeAudit(c.env.kmddns, client.token, entry);
 
   const { token: _t, webhook_secret: _s, ...publicRecord } = updated;
   return c.json(publicRecord);
@@ -285,15 +285,7 @@ export async function handleRotateToken(c: AppContext): Promise<Response> {
   const plainToken = crypto.randomUUID();
   const newHash = await sha256(plainToken);
 
-  const updated: ClientRecord = { ...client, token: newHash };
-
-  await putClient(c.env.DDNS_KV, updated);
-  await deleteClientKey(c.env.DDNS_KV, oldHash);
-
-  await putSubdomainIndex(c.env.DDNS_KV, client.subdomain, newHash);
-  for (const hostname of client.custom_domains) {
-    await putCustomDomainIndex(c.env.DDNS_KV, hostname, newHash);
-  }
+  await rotateClientToken(c.env.kmddns, oldHash, newHash);
 
   const now = new Date().toISOString();
   const entry: AuditEntry = {
@@ -302,7 +294,7 @@ export async function handleRotateToken(c: AppContext): Promise<Response> {
     timestamp: now,
     details: {},
   };
-  await writeAudit(c.env.DDNS_KV, newHash, entry);
+  await writeAudit(c.env.kmddns, newHash, entry);
 
   return c.json({ token: plainToken });
 }
@@ -312,7 +304,7 @@ export async function handleDeleteClient(c: AppContext): Promise<Response> {
   const client = c.get('client')!;
 
   await withdrawDnsRecords(c.env, client);
-  await deleteClient(c.env.DDNS_KV, client.token);
+  await deleteClient(c.env.kmddns, client.token);
 
   const now = new Date().toISOString();
   const entry: AuditEntry = {
@@ -321,7 +313,7 @@ export async function handleDeleteClient(c: AppContext): Promise<Response> {
     timestamp: now,
     details: { subdomain: client.subdomain },
   };
-  await writeAudit(c.env.DDNS_KV, client.token, entry);
+  await writeAudit(c.env.kmddns, client.token, entry);
 
   return new Response(null, { status: 204 });
 }

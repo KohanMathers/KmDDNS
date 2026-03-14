@@ -1,5 +1,5 @@
 import type { AppContext, ClientRecord, AuditEntry, Env } from '../types.js';
-import { getClient, putClient, writeAudit, isBannedIp, incrementHourlyUpdates } from '../kv.js';
+import { getClient, putClient, writeAudit, isBannedIp, incrementHourlyUpdates } from '../db.js';
 import { sha256 } from '../auth.js';
 import { upsertARecord, upsertAAAARecord, upsertSRVRecord, withdrawAAAARecord, withdrawSRVRecord } from '../dns.js';
 import { dispatchWebhook } from '../webhook.js';
@@ -61,7 +61,7 @@ async function commitUpdate(
       }
     }
 
-    await putClient(env.DDNS_KV, updated);
+    await putClient(env.kmddns, updated);
 
     const entry: AuditEntry = {
       action: 'update',
@@ -75,7 +75,7 @@ async function commitUpdate(
         changed,
       },
     };
-    await writeAudit(env.DDNS_KV, client.token, entry);
+    await writeAudit(env.kmddns, client.token, entry);
 
     if (ipChanged || portChanged) {
       dispatchWebhook(
@@ -106,7 +106,7 @@ export async function handleUpdateGet(c: AppContext): Promise<Response> {
   }
 
   const hash = await sha256(rawToken);
-  const client = await getClient(c.env.DDNS_KV, hash);
+  const client = await getClient(c.env.kmddns, hash);
   if (client === null) {
     return c.json({ error: 'invalid_token', message: 'Token not recognised' }, 401);
   }
@@ -114,7 +114,7 @@ export async function handleUpdateGet(c: AppContext): Promise<Response> {
     return c.json({ error: 'account_disabled', message: 'This account has been disabled' }, 403);
   }
 
-  const { allowed, retryAfter } = await checkUpdateLimit(c.env.DDNS_KV, hash);
+  const { allowed, retryAfter } = await checkUpdateLimit(c.env.kmddns, hash);
   if (!allowed) {
     return c.json(
       { error: 'rate_limited', message: 'Update rate limit exceeded' },
@@ -125,7 +125,7 @@ export async function handleUpdateGet(c: AppContext): Promise<Response> {
 
   const sourceIp = c.req.header('CF-Connecting-IP') ?? '0.0.0.0';
 
-  if (await isBannedIp(c.env.DDNS_KV, sourceIp)) {
+  if (await isBannedIp(c.env.kmddns, sourceIp)) {
     return c.json({ error: 'banned', message: 'This IP has been banned' }, 403);
   }
 
@@ -136,7 +136,7 @@ export async function handleUpdateGet(c: AppContext): Promise<Response> {
     return c.json({ error: 'ip_not_allowed', message: 'Source IP is not in the allowed list' }, 403);
   }
 
-  await incrementHourlyUpdates(c.env.DDNS_KV);
+  await incrementHourlyUpdates(c.env.kmddns);
 
   const config = getConfig(c.env);
   const ip = c.req.query('ip') ?? sourceIp;
@@ -190,7 +190,7 @@ export async function handleUpdatePost(c: AppContext): Promise<Response> {
   const client = c.get('client')!;
   const sourceIp = c.req.header('CF-Connecting-IP') ?? '0.0.0.0';
 
-  const { allowed, retryAfter } = await checkUpdateLimit(c.env.DDNS_KV, client.token);
+  const { allowed, retryAfter } = await checkUpdateLimit(c.env.kmddns, client.token);
   if (!allowed) {
     return c.json(
       { error: 'rate_limited', message: 'Update rate limit exceeded' },
@@ -199,7 +199,7 @@ export async function handleUpdatePost(c: AppContext): Promise<Response> {
     );
   }
 
-  if (await isBannedIp(c.env.DDNS_KV, sourceIp)) {
+  if (await isBannedIp(c.env.kmddns, sourceIp)) {
     return c.json({ error: 'banned', message: 'This IP has been banned' }, 403);
   }
 
@@ -210,7 +210,7 @@ export async function handleUpdatePost(c: AppContext): Promise<Response> {
     return c.json({ error: 'ip_not_allowed', message: 'Source IP is not in the allowed list' }, 403);
   }
 
-  await incrementHourlyUpdates(c.env.DDNS_KV);
+  await incrementHourlyUpdates(c.env.kmddns);
 
   let body: Record<string, unknown> = {};
   try {
