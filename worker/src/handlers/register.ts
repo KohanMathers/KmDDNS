@@ -1,4 +1,4 @@
-import type { AppContext } from '../types.js';
+import type { AppContext, ClientRecord } from '../types.js';
 import { getConfig, RESERVED_SUBDOMAINS, SUBDOMAIN_REGEX } from '../config.js';
 import { getBySubdomain, putClient, putSubdomainIndex, isBannedSubdomain, isBannedIp } from '../kv.js';
 import { sha256 } from '../auth.js';

@@ -17,7 +17,7 @@ export interface ClientSummary {
 }
 
 export interface ClientMetadata {
-  safe?: Omit<ClientRecord, 'webhook_secret'>;
+  safe?: ClientRecord;
   summary?: ClientSummary;
 }
 
@@ -50,7 +50,7 @@ export async function getClient(kv: KVNamespace, token: string): Promise<ClientR
 }
 
 export async function putClient(kv: KVNamespace, record: ClientRecord): Promise<void> {
-  const { webhook_secret: _secret, ...safe } = record;
+  const safe: ClientRecord = { ...record, webhook_secret: null };
   const safeJson = JSON.stringify(safe);
   const metadata: ClientMetadata = {};
   if (safeJson.length <= CLIENT_METADATA_SAFE_MAX_BYTES) {
