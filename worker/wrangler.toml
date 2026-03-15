@@ -8,6 +8,14 @@ database_name = "kmddns"
 database_id = "1ca88f67-af60-4d13-af53-38b6ec36e984"
 migrations_dir = "migrations"
 
+[[durable_objects.bindings]]
+name = "TUNNEL_SESSION"
+class_name = "TunnelSession"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["TunnelSession"]
+
 [vars]
 BASE_DOMAIN = "ddns.kmathers.co.uk"
 MAX_SUBDOMAIN_LENGTH = "63"
@@ -15,6 +23,8 @@ DEFAULT_TTL = "60"
 STALE_DAYS = "30"
 ALLOW_PRIVATE_IPS = "false"
 WEBHOOK_HOST_ALLOWLIST = ""
+RELAY_IP = ""
+RELAY_PORT = "25565"
 
 [triggers]
 crons = ["0 3 * * *"]
@@ -24,3 +34,5 @@ crons = ["0 3 * * *"]
 #   CF_ZONE_ID     — Cloudflare zone ID for your domain
 #   ADMIN_SECRET   — Long-lived secret for admin route access
 #   RESEND_API_KEY — (optional) Resend API key for stale-record notification emails
+#   RELAY_SECRET   — Shared secret between the relay VPS and the Worker
+

@@ -245,6 +245,31 @@ export async function handlePatchClient(c: AppContext): Promise<Response> {
     }
   }
 
+  if ('tunnel_enabled' in body) {
+    if (typeof body.tunnel_enabled !== 'boolean') {
+      return c.json({ error: 'invalid_field', message: 'tunnel_enabled must be a boolean' }, 400);
+    }
+    const relayIp = c.env.RELAY_IP;
+    if (body.tunnel_enabled && !relayIp) {
+      return c.json({ error: 'tunnel_unavailable', message: 'Tunnel feature is not configured on this server' }, 503);
+    }
+    if (body.tunnel_enabled && !client.tunnel_enabled) {
+      await upsertARecord(c.env, updated.subdomain, relayIp, updated.ttl);
+      if (updated.srv_prefix !== null) {
+        const relayPort = parseInt(c.env.RELAY_PORT ?? '25565', 10);
+        await upsertSRVRecord(c.env, updated.subdomain, updated.srv_prefix, relayPort, updated.ttl);
+      }
+    } else if (!body.tunnel_enabled && client.tunnel_enabled) {
+      if (updated.ip !== null) {
+        await upsertARecord(c.env, updated.subdomain, updated.ip, updated.ttl);
+      }
+      if (updated.srv_prefix !== null && updated.port !== null) {
+        await upsertSRVRecord(c.env, updated.subdomain, updated.srv_prefix, updated.port, updated.ttl);
+      }
+    }
+    updated.tunnel_enabled = body.tunnel_enabled;
+  }
+
   if ('redirect_http' in body) {
     if (typeof body.redirect_http !== 'boolean') {
       return c.json({ error: 'invalid_field', message: 'redirect_http must be a boolean' }, 400);

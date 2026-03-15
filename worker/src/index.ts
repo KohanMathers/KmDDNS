@@ -10,6 +10,8 @@ import { handleAdminListClients, handleAdminDeleteClient, handleAdminBan, handle
 import { adminAuth } from './auth.js';
 import { checkGlobalLimit } from './ratelimit.js';
 import { handleScheduled } from './scheduled.js';
+import { getClient, getBySubdomain } from './db.js';
+export { TunnelSession } from './tunnel.js';
 
 const VERSION = '0.1.0';
 const startTime = Date.now();
@@ -63,6 +65,50 @@ app.get('/admin/clients', adminAuth, handleAdminListClients);
 app.delete('/admin/client/:token', adminAuth, handleAdminDeleteClient);
 app.post('/admin/ban', adminAuth, handleAdminBan);
 app.get('/admin/stats', adminAuth, handleAdminStats);
+
+/**
+ * GET /v1/tunnel — host (mod) WebSocket connection, authenticated via Bearer token.
+ * Upgrades to WebSocket and forwards to the TunnelSession Durable Object.
+ */
+app.get('/v1/tunnel', bearerAuth, async (c) => {
+  const client = c.get('client')!;
+  if (!client.tunnel_enabled) {
+    return c.json({ error: 'tunnel_disabled', message: 'Tunnel is not enabled for this client' }, 403);
+  }
+
+  const id = c.env.TUNNEL_SESSION.idFromName(client.token);
+  const stub = c.env.TUNNEL_SESSION.get(id);
+  return stub.fetch(c.req.raw);
+});
+
+/**
+ * GET /v1/tunnel/relay/:subdomain — relay WebSocket connection, authenticated via X-Relay-Secret header.
+ * Upgrades to WebSocket and forwards to the TunnelSession Durable Object.
+ */
+app.get('/v1/tunnel/relay/:subdomain', async (c) => {
+  const secret = c.req.header('X-Relay-Secret');
+  if (!secret || secret !== c.env.RELAY_SECRET) {
+    return c.json({ error: 'unauthorized', message: 'Invalid relay secret' }, 401);
+  }
+
+  const subdomain = c.req.param('subdomain');
+  const token = await getBySubdomain(c.env.kmddns, subdomain);
+  if (token === null) {
+    return c.json({ error: 'not_found', message: 'Subdomain not found' }, 404);
+  }
+
+  const record = await getClient(c.env.kmddns, token);
+  if (record === null || !record.enabled || !record.tunnel_enabled) {
+    return c.json({ error: 'not_found', message: 'Tunnel not active for this subdomain' }, 404);
+  }
+
+  const id = c.env.TUNNEL_SESSION.idFromName(token);
+  const stub = c.env.TUNNEL_SESSION.get(id);
+
+  const url = new URL(c.req.url);
+  url.pathname = '/relay';
+  return stub.fetch(new Request(url.toString(), c.req.raw));
+});
 
 app.get('/v1/health', (c) => {
   return c.json({

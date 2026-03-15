@@ -43,6 +43,7 @@ interface ClientRow {
   enabled: number;
   redirect_http: number;
   notes: string | null;
+  tunnel_enabled: number;
 }
 
 function rowToRecord(row: ClientRow): ClientRecord {
@@ -67,6 +68,7 @@ function rowToRecord(row: ClientRow): ClientRecord {
     enabled: row.enabled === 1,
     redirect_http: row.redirect_http === 1,
     notes: row.notes,
+    tunnel_enabled: row.tunnel_enabled === 1,
   };
 }
 
@@ -80,8 +82,8 @@ export async function putClient(db: D1Database, record: ClientRecord): Promise<v
   await db.prepare(`
     INSERT INTO clients (token, subdomain, owner_email, created_at, last_seen, ip, ipv6, port,
       srv_prefix, ttl, update_interval, tags, metadata, webhook_url, webhook_secret,
-      allowed_update_ips, custom_domains, enabled, redirect_http, notes)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      allowed_update_ips, custom_domains, enabled, redirect_http, notes, tunnel_enabled)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(token) DO UPDATE SET
       subdomain = excluded.subdomain,
       owner_email = excluded.owner_email,
@@ -101,7 +103,8 @@ export async function putClient(db: D1Database, record: ClientRecord): Promise<v
       custom_domains = excluded.custom_domains,
       enabled = excluded.enabled,
       redirect_http = excluded.redirect_http,
-      notes = excluded.notes
+      notes = excluded.notes,
+      tunnel_enabled = excluded.tunnel_enabled
   `).bind(
     record.token,
     record.subdomain,
@@ -123,6 +126,7 @@ export async function putClient(db: D1Database, record: ClientRecord): Promise<v
     record.enabled ? 1 : 0,
     record.redirect_http ? 1 : 0,
     record.notes,
+    record.tunnel_enabled ? 1 : 0,
   ).run();
 }
 

@@ -1,0 +1,15 @@
+[Unit]
+Description=KmDDNS Relay
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+EnvironmentFile=/etc/kmddns-relay/env
+ExecStart=/usr/local/bin/kmddns-relay
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

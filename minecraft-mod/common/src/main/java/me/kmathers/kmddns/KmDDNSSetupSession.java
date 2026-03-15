@@ -19,6 +19,7 @@ public class KmDDNSSetupSession {
         AWAITING_TOKEN,
         AWAITING_PORT,
         AWAITING_INTERVAL,
+        AWAITING_TUNNEL,
         CONFIRMING,
         DONE
     }
@@ -30,6 +31,7 @@ public class KmDDNSSetupSession {
     private String pendingSubdomain;
     private int pendingPort = 0;
     private int pendingInterval = 300;
+    private boolean pendingTunnel = false;
 
     private final String apiBase;
     private final int detectedPort;
@@ -44,6 +46,7 @@ public class KmDDNSSetupSession {
     public String getPendingToken() { return pendingToken; }
     public int getPendingPort() { return pendingPort; }
     public int getPendingInterval() { return pendingInterval; }
+    public boolean getPendingTunnel() { return pendingTunnel; }
 
 
     /** Returns the initial choice screen. */
@@ -293,6 +296,37 @@ public class KmDDNSSetupSession {
             return lines;
         }
         this.pendingInterval = seconds;
+        this.state = State.AWAITING_TUNNEL;
+        return tunnelStep();
+    }
+
+    private List<SetupLine> tunnelStep() {
+        var lines = new ArrayList<SetupLine>();
+        lines.add(new SetupLine("§7─────────────────────────"));
+        lines.add(new SetupLine("§7Would you like to enable §btunnel mode§7?"));
+        lines.add(new SetupLine("§7(No port forwarding required — traffic routes through KmDDNS)"));
+        lines.add(new SetupLine("§7"));
+        lines.add(new SetupLine(
+                "§a§l▶ [Yes — use tunnel]",
+                "/kmddns setup tunnel enable", false,
+                "Enable tunnel mode — no port forwarding needed"));
+        lines.add(new SetupLine(
+                "§7§l▶ [No — I'll forward my port]",
+                "/kmddns setup tunnel disable", false,
+                "Use standard DDNS — requires port forwarding"));
+        return lines;
+    }
+
+    public List<SetupLine> handleTunnelEnable() {
+        if (state != State.AWAITING_TUNNEL) return noSessionError();
+        this.pendingTunnel = true;
+        this.state = State.CONFIRMING;
+        return confirmStep();
+    }
+
+    public List<SetupLine> handleTunnelDisable() {
+        if (state != State.AWAITING_TUNNEL) return noSessionError();
+        this.pendingTunnel = false;
         this.state = State.CONFIRMING;
         return confirmStep();
     }
@@ -314,6 +348,7 @@ public class KmDDNSSetupSession {
         lines.add(new SetupLine("§aPort:     §f" +
                 (pendingPort == 0 ? "auto (" + detectedPort + ")" : String.valueOf(pendingPort))));
         lines.add(new SetupLine("§aInterval: §f" + pendingInterval + "s"));
+        lines.add(new SetupLine("§aTunnel:   §f" + (pendingTunnel ? "§aenabled (no port forwarding)" : "§7disabled")));
         lines.add(new SetupLine("§7"));
         lines.add(new SetupLine(
                 "§a§l▶ [✓ Confirm & Save]",

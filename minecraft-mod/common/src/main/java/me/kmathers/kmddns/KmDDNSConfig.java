@@ -27,6 +27,7 @@ public class KmDDNSConfig {
             metadata_motd = true
             metadata_player_count = true
             log_updates = true
+            tunnel = false
             """;
 
     public boolean enabled = true;
@@ -38,6 +39,7 @@ public class KmDDNSConfig {
     public boolean metadataMotd = true;
     public boolean metadataPlayerCount = true;
     public boolean logUpdates = true;
+    public boolean tunnel = false;
 
     private final Path configPath;
 
@@ -94,6 +96,7 @@ public class KmDDNSConfig {
                 case "metadata_motd" -> metadataMotd = parseBoolean(value, true);
                 case "metadata_player_count" -> metadataPlayerCount = parseBoolean(value, true);
                 case "log_updates" -> logUpdates = parseBoolean(value, true);
+                case "tunnel" -> tunnel = parseBoolean(value, false);
                 default -> { /* ignore unknown keys */ }
             }
         }
@@ -201,6 +204,7 @@ public class KmDDNSConfig {
         sb.append("metadata_motd = ").append(metadataMotd).append("\n");
         sb.append("metadata_player_count = ").append(metadataPlayerCount).append("\n");
         sb.append("log_updates = ").append(logUpdates).append("\n");
+        sb.append("tunnel = ").append(tunnel).append("\n");
         try {
             Files.createDirectories(configPath.getParent());
             Files.writeString(configPath, sb.toString());
@@ -222,6 +226,7 @@ public class KmDDNSConfig {
         return "KmDDNSConfig{enabled=" + enabled + ", token=" + (hasToken() ? "[set]" : "[empty]") +
                 ", apiBase=" + apiBase + ", port=" + port + ", updateInterval=" + updateInterval +
                 ", tags=" + tags + ", metadataMotd=" + metadataMotd +
-                ", metadataPlayerCount=" + metadataPlayerCount + ", logUpdates=" + logUpdates + "}";
+                ", metadataPlayerCount=" + metadataPlayerCount + ", logUpdates=" + logUpdates +
+                ", tunnel=" + tunnel + "}";
     }
 }

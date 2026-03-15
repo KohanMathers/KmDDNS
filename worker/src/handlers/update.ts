@@ -114,6 +114,10 @@ export async function handleUpdateGet(c: AppContext): Promise<Response> {
     return c.json({ error: 'account_disabled', message: 'This account has been disabled' }, 403);
   }
 
+  if (client.tunnel_enabled) {
+    return c.text('NOCHG', 200);
+  }
+
   const { allowed, retryAfter } = await checkUpdateLimit(c.env.kmddns, hash);
   if (!allowed) {
     return c.json(
@@ -188,6 +192,12 @@ export async function handleUpdateGet(c: AppContext): Promise<Response> {
 /** POST /v1/update — full JSON update; token in Authorization header, JSON response. */
 export async function handleUpdatePost(c: AppContext): Promise<Response> {
   const client = c.get('client')!;
+
+  if (client.tunnel_enabled) {
+    const { token: _token, webhook_secret: _secret, ...publicRecord } = client;
+    return c.json(publicRecord);
+  }
+
   const sourceIp = c.req.header('CF-Connecting-IP') ?? '0.0.0.0';
 
   const { allowed, retryAfter } = await checkUpdateLimit(c.env.kmddns, client.token);

@@ -3,6 +3,7 @@ import type { Context } from 'hono';
 /** Cloudflare Worker environment bindings and secrets. */
 export interface Env {
   kmddns: D1Database;
+  TUNNEL_SESSION: DurableObjectNamespace;
   BASE_DOMAIN: string;
   MAX_SUBDOMAIN_LENGTH: string;
   DEFAULT_TTL: string;
@@ -10,6 +11,9 @@ export interface Env {
   CF_API_TOKEN: string;
   CF_ZONE_ID: string;
   ADMIN_SECRET: string;
+  RELAY_SECRET: string;
+  RELAY_IP: string;
+  RELAY_PORT?: string;
   ALLOW_PRIVATE_IPS?: string;
   WEBHOOK_HOST_ALLOWLIST?: string;
   RESEND_API_KEY?: string;
@@ -37,6 +41,7 @@ export interface ClientRecord {
   enabled: boolean;
   redirect_http: boolean;
   notes: string | null;
+  tunnel_enabled: boolean;
 }
 
 /** Hono context variables set by auth middleware. */

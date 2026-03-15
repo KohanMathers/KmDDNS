@@ -100,6 +100,7 @@ export async function handleRegister(c: AppContext): Promise<Response> {
     enabled: true,
     redirect_http: body.redirect_http === true,
     notes: null,
+    tunnel_enabled: false,
   };
 
   await putClient(c.env.kmddns, record);

@@ -24,5 +24,6 @@ export async function handleLookup(c: AppContext): Promise<Response> {
     tags: record.tags,
     metadata: record.metadata,
     last_seen: record.last_seen,
+    tunnel_enabled: record.tunnel_enabled,
   });
 }

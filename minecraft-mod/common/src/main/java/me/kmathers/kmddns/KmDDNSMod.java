@@ -29,6 +29,7 @@ public class KmDDNSMod {
     private final KmDDNSConfig config;
     private final IServerAccessor serverAccessor;
     private KmDDNSHttpClient httpClient;
+    private KmDDNSTunnelClient tunnelClient;
 
     private ScheduledExecutorService scheduler;
     private ScheduledFuture<?> heartbeatTask;
@@ -67,6 +68,13 @@ public class KmDDNSMod {
         resolvedPort = resolvePort(serverDir);
         httpClient = new KmDDNSHttpClient(config.apiBase, config.token);
 
+        if (config.tunnel) {
+            tunnelClient = new KmDDNSTunnelClient(config.apiBase, config.token, resolvedPort);
+            tunnelClient.start();
+            LOGGER.info("[KmDDNS] Tunnel mode enabled. Port=" + resolvedPort);
+            return;
+        }
+
         scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
             var t = new Thread(r, "kmddns-scheduler");
             t.setDaemon(true);
@@ -92,10 +100,13 @@ public class KmDDNSMod {
      * Shuts down heartbeat and marks the record as disabled.
      */
     public void onServerStop() {
+        if (tunnelClient != null) {
+            tunnelClient.stop();
+            tunnelClient = null;
+        }
         if (scheduler != null && !scheduler.isShutdown()) {
             scheduler.shutdownNow();
         }
-
     }
 
     /**
@@ -195,6 +206,11 @@ public class KmDDNSMod {
             }
         }
 
+        if (config.tunnel) {
+            boolean tc = tunnelClient != null && tunnelClient.isConnected();
+            lines.add("§aTunnel: §f" + (tc ? "§aconnected" : "§cdisconnected"));
+        }
+
         if (status != null) {
             lines.add("§aEnabled: §f" + status.enabled);
             lines.add("§aSubdomain: §f" + (status.subdomain.isEmpty() ? "§7(not set)" : status.subdomain));
@@ -276,6 +292,16 @@ public class KmDDNSMod {
         return setupSession.handleInterval(seconds);
     }
 
+    public List<SetupLine> handleSetupTunnelEnable() {
+        if (setupSession == null) return noSession();
+        return setupSession.handleTunnelEnable();
+    }
+
+    public List<SetupLine> handleSetupTunnelDisable() {
+        if (setupSession == null) return noSession();
+        return setupSession.handleTunnelDisable();
+    }
+
     /**
      * Confirm and save: writes config to disk then restarts the heartbeat.
      */
@@ -287,6 +313,7 @@ public class KmDDNSMod {
         config.token = setupSession.getPendingToken();
         config.port = setupSession.getPendingPort();
         config.updateInterval = setupSession.getPendingInterval();
+        config.tunnel = setupSession.getPendingTunnel();
         config.enabled = true;
         config.save();
         setupSession = null;

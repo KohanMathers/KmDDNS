@@ -85,6 +85,11 @@ public class ForgeEntrypoint {
                                 .then(Commands.literal("interval")
                                         .then(Commands.argument("seconds", IntegerArgumentType.integer(30))
                                                 .executes(this::executeSetupInterval)))
+                                .then(Commands.literal("tunnel")
+                                        .then(Commands.literal("enable")
+                                                .executes(this::executeSetupTunnelEnable))
+                                        .then(Commands.literal("disable")
+                                                .executes(this::executeSetupTunnelDisable)))
                                 .then(Commands.literal("confirm")
                                         .executes(this::executeSetupConfirm))
                                 .then(Commands.literal("cancel")
@@ -159,6 +164,18 @@ public class ForgeEntrypoint {
     private int executeSetupConfirm(CommandContext<CommandSourceStack> context) {
         if (mod == null) { notInitialized(context); return 0; }
         sendSetupLines(context.getSource(), mod.handleSetupConfirm());
+        return 1;
+    }
+
+    private int executeSetupTunnelEnable(CommandContext<CommandSourceStack> context) {
+        if (mod == null) { notInitialized(context); return 0; }
+        sendSetupLines(context.getSource(), mod.handleSetupTunnelEnable());
+        return 1;
+    }
+
+    private int executeSetupTunnelDisable(CommandContext<CommandSourceStack> context) {
+        if (mod == null) { notInitialized(context); return 0; }
+        sendSetupLines(context.getSource(), mod.handleSetupTunnelDisable());
         return 1;
     }
 
