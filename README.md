@@ -85,3 +85,12 @@ Full deployment instructions are in [`worker/README.md`](worker/README.md).
 ## License
 
 MIT
+
+---
+
+
+### A quick note
+
+I build these tools for fun and for the community. Keeping everything running does have real maintenance costs, and even $1 goes a long way.
+
+If you enjoy the tools and want to give back, you can support me here: [Buy me a coffee](https://buymeacoffee.com/kohanmathers). No pressure either way — thanks for being here.
