@@ -189,25 +189,22 @@ public class KmDDNSTunnelClient {
     }
 
     private void handleConnect(int connId, byte[] initialData) {
-        executor.submit(() -> {
-            try {
-                var socket = new Socket("127.0.0.1", mcPort);
-                sockets.put(connId, socket);
+        try {
+            var socket = new Socket("127.0.0.1", mcPort);
+            sockets.put(connId, socket);
 
-                sendFrame(FRAME_ACK, connId, new byte[0]);
+            sendFrame(FRAME_ACK, connId, new byte[0]);
 
-                if (initialData.length > 0) {
-                    socket.getOutputStream().write(initialData);
-                    socket.getOutputStream().flush();
-                }
-
-                pipeLocalToWs(connId, socket);
-
-            } catch (Exception e) {
-                LOGGER.warning("[KmDDNS] Could not connect to local MC server for connId=" + connId + ": " + e.getMessage());
-                sendFrame(FRAME_DISCONNECT, connId, new byte[0]);
+            if (initialData.length > 0) {
+                socket.getOutputStream().write(initialData);
+                socket.getOutputStream().flush();
             }
-        });
+
+            executor.submit(() -> pipeLocalToWs(connId, socket));
+        } catch (Exception e) {
+            LOGGER.warning("[KmDDNS] Could not connect to local MC server for connId=" + connId + ": " + e.getMessage());
+            sendFrame(FRAME_DISCONNECT, connId, new byte[0]);
+        }
     }
 
     private void handleData(int connId, byte[] data) {
