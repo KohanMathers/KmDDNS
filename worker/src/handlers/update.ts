@@ -53,9 +53,9 @@ async function commitUpdate(
         await upsertAAAARecord(env, client.subdomain, resolvedIpv6, client.ttl);
       }
     }
-    if (portChanged && client.srv_prefix !== null) {
+    if (client.srv_prefix !== null) {
       if (resolvedPort === null) {
-        await withdrawSRVRecord(env, client.subdomain, client.srv_prefix);
+        if (portChanged) await withdrawSRVRecord(env, client.subdomain, client.srv_prefix);
       } else {
         await upsertSRVRecord(env, client.subdomain, client.srv_prefix, resolvedPort, client.ttl);
       }

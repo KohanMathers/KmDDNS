@@ -2,7 +2,7 @@ import type { AppContext, ClientRecord } from '../types.js';
 import { getConfig, RESERVED_SUBDOMAINS, SUBDOMAIN_REGEX } from '../config.js';
 import { getBySubdomain, putClient, putSubdomainIndex, isBannedSubdomain, isBannedIp } from '../db.js';
 import { sha256 } from '../auth.js';
-import { upsertARecord } from '../dns.js';
+import { upsertARecord, upsertSRVRecord } from '../dns.js';
 import { checkRegistrationLimit } from '../ratelimit.js';
 import { validateSrvPrefix, validateTags } from '../validation.js';
 
@@ -105,7 +105,10 @@ export async function handleRegister(c: AppContext): Promise<Response> {
   await putClient(c.env.kmddns, record);
   await putSubdomainIndex(c.env.kmddns, subdomain, tokenHash);
 
-  await upsertARecord(c.env, subdomain, '0.0.0.0', config.defaultTtl);
+  await upsertARecord(c.env, subdomain, '0.0.0.0', ttl);
+  if (port !== null && srvPrefix !== null) {
+    await upsertSRVRecord(c.env, subdomain, srvPrefix, port, ttl);
+  }
 
   const fqdn = `${subdomain}.${config.baseDomain}`;
 

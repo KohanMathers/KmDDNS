@@ -22,3 +22,10 @@ worker/dist/
 .idea/
 *.suo
 *.user
+
+# Java
+.gradle/
+build/
+
+# Temporary ignore for commit
+minecraft-mod/
