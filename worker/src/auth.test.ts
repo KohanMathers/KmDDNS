@@ -64,6 +64,7 @@ function makeDb(): D1Database {
 function makeEnv(db: D1Database, overrides: Partial<Env> = {}): Env {
   return {
     kmddns: db,
+    TUNNEL_SESSION: {} as DurableObjectNamespace,
     BASE_DOMAIN: 'ddns.example.com',
     MAX_SUBDOMAIN_LENGTH: '63',
     DEFAULT_TTL: '60',
@@ -71,6 +72,8 @@ function makeEnv(db: D1Database, overrides: Partial<Env> = {}): Env {
     CF_API_TOKEN: 'tok',
     CF_ZONE_ID: 'zone',
     ADMIN_SECRET: 'super-secret',
+    RELAY_SECRET: 'relay-secret',
+    RELAY_IP: '1.2.3.4',
     ...overrides,
   };
 }
@@ -96,6 +99,7 @@ const BASE_RECORD: ClientRecord = {
   enabled: true,
   redirect_http: false,
   notes: null,
+  tunnel_enabled: false,
 };
 
 let db: D1Database;

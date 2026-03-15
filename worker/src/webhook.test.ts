@@ -23,6 +23,7 @@ const BASE_RECORD: ClientRecord = {
   enabled: true,
   redirect_http: false,
   notes: null,
+  tunnel_enabled: false,
 };
 
 function makeCtx() {
