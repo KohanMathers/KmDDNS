@@ -1,0 +1,36 @@
+subprojects {
+    apply plugin: 'java'
+    group = 'me.kmathers.kmddns'
+    version = '1.0.0'
+}
+
+def versions = ['v1_21_1', 'v1_21_4', 'v1_21_5', 'v1_21_11']
+def isWindows = System.getProperty('os.name').toLowerCase().contains('windows')
+
+versions.each { ver ->
+    tasks.register("build_${ver}", Exec) {
+        group = 'versioned build'
+        workingDir file(ver)
+        if (isWindows) {
+            commandLine 'cmd', '/c', 'gradlew.bat', 'build'
+        } else {
+            commandLine './gradlew', 'build'
+        }
+    }
+    tasks.register("clean_${ver}", Delete) {
+        group = 'versioned build'
+        delete file("${ver}/build")
+        delete file("${ver}/fabric/build")
+        delete file("${ver}/neoforge/build")
+    }
+}
+
+tasks.register('buildAll') {
+    group = 'versioned build'
+    dependsOn versions.collect { "build_${it}" }
+}
+
+tasks.register('cleanAll') {
+    group = 'versioned build'
+    dependsOn versions.collect { "clean_${it}" }
+}

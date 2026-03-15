@@ -1,0 +1,24 @@
+modLoader = "javafml"
+loaderVersion = "[4,)"
+license = "MIT"
+
+[[mods]]
+    modId = "kmddns"
+    version = "1.0.0"
+    displayName = "KmDDNS"
+    description = '''
+Automatically keeps your KmDDNS record updated with your Minecraft server's IP and port.
+Add your token to config/kmddns.toml and the mod handles the rest.
+'''
+    [[dependencies.kmddns]]
+        modId = "neoforge"
+        type = "required"
+        versionRange = "[21.4,)"
+        ordering = "NONE"
+        side = "SERVER"
+    [[dependencies.kmddns]]
+        modId = "minecraft"
+        type = "required"
+        versionRange = "[1.21.4,1.21.5)"
+        ordering = "NONE"
+        side = "SERVER"

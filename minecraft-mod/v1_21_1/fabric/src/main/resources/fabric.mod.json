@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "kmddns",
+  "version": "${version}",
+  "name": "KmDDNS",
+  "description": "Automatically keeps your KmDDNS record updated with your Minecraft server's IP and port.",
+  "authors": ["kmathers"],
+  "contact": {
+    "sources": "https://github.com/kohanmathers/kmddns"
+  },
+  "license": "MIT",
+  "environment": "server",
+  "entrypoints": {
+    "server": [
+      "me.kmathers.kmddns.fabric.FabricEntrypoint"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "fabric-api": "*",
+    "minecraft": ">=1.21.1 <1.21.2"
+  }
+}

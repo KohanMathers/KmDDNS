@@ -1,5 +1,6 @@
 TEST.md
 INTERNAL.md
+TUNNEL.md
 
 # Dependencies
 node_modules/
@@ -26,6 +27,4 @@ worker/dist/
 # Java
 .gradle/
 build/
-
-# Temporary ignore for commit
-minecraft-mod/
+bin/

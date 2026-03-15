@@ -1,0 +1,33 @@
+plugins {
+    id 'net.neoforged.gradle.userdev' version '7.1.20'
+}
+
+runs {
+    configureEach {
+        systemProperty 'forge.logging.console.level', 'debug'
+        modSource project.sourceSets.main
+    }
+    server {
+        server()
+        workingDirectory project.file('run')
+    }
+}
+
+dependencies {
+    implementation "net.neoforged:neoforge:${project.neoforge_version}"
+    implementation project(':common')
+}
+
+jar {
+    archiveBaseName = 'kmddns'
+    from project(':common').sourceSets.main.output
+
+    manifest {
+        attributes([
+            'Specification-Title'   : 'kmddns',
+            'Specification-Version' : '1',
+            'Implementation-Title'  : project.name,
+            'Implementation-Version': project.version,
+        ])
+    }
+}
